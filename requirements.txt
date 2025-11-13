@@ -1,0 +1,5 @@
+pandas
+stix2
+openpyxl
+jsonschema
+regex
