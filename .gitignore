@@ -4,5 +4,3 @@ __pycache__/
 *.tmp
 *.ipynb_checkpoints
 .env
-data/source/*
-!data/source/.keep
