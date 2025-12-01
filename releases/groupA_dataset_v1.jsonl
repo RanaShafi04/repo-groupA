@@ -1,0 +1,11 @@
+{
+"version": "1.0",
+"generated_at": "2025-11-26T12:00:00Z",
+"nodes_file": "data/processed/nodes_standardized.jsonl",
+"relations_file": "data/processed/relations_standardized.jsonl",
+"schema_file": "schema/unified_schema.json",
+"checksum_nodes": "sha256:[PLACEHOLDER_NODES]",
+"checksum_relations": "sha256:[PLACEHOLDER_RELATIONS]",
+"description": "Group A unified crosswalk dataset linking MITRE ATT&CK Techniques to CWE Weaknesses and NIST 800-53 controls.",
+"notes": "Generated as part of Erasmus Mundus Group A Cybersecurity Knowledge Graph."
+}

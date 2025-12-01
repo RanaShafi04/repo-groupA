@@ -1,0 +1,2 @@
+version,generated_at,nodes_file,relations_file,schema_file,checksum_nodes,checksum_relations,description
+1.0,2025-11-26T12:00:00Z,data/processed/nodes_standardized.jsonl,data/processed/relations_standardized.jsonl,schema/unified_schema.json,sha256:[PLACEHOLDER_NODES],sha256:[PLACEHOLDER_RELATIONS],"Group A unified crosswalk dataset linking MITRE ATT&CK Techniques to CWE Weaknesses and NIST 800-53 controls."
