@@ -1,0 +1,4 @@
+sha256:[PLACEHOLDER_NODES]  data/processed/nodes_standardized.jsonl
+sha256:[PLACEHOLDER_RELATIONS]  data/processed/relations_standardized.jsonl
+sha256:[PLACEHOLDER_JSONL]  releases/groupA_dataset_v1.jsonl
+sha256:[PLACEHOLDER_CSV]  releases/groupA_dataset_v1.csv

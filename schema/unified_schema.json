@@ -1,0 +1,19 @@
+{
+  "node": {
+    "id": "string",
+    "source": "MITRE | CWE | NIST",
+    "title": "string",
+    "summary_512": "string",
+    "description": "string",
+    "categories": ["list of strings"],
+    "keywords": ["list of strings"],
+    "rev_date": "YYYY-MM-DD",
+    "url": "string"
+  },
+  "edge": {
+    "src_id": "string",
+    "dst_id": "string",
+    "relation_type": "maps_to | related_to | mitigated_by",
+    "evidence": "string"
+  }
+}
