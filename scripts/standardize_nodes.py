@@ -1,188 +1,120 @@
+#!/usr/bin/env python3
+"""
+build_nodes_standardized.py
+
+Unifies MITRE, CWE, and NIST parsed JSONL files into the
+LLM-ready unified schema:
+
+{
+  "id": "...",
+  "source": "MITRE|CWE|NIST",
+  "title": "...",
+  "description": "...",
+  "summary_512": "...",
+  "categories": [...],
+  "keywords": [...],
+  "rev_date": "...",
+  "url": "..."
+}
+"""
+
 import json
-import re
-from datetime import datetime
-from bs4 import BeautifulSoup
 from pathlib import Path
 
-# -----------------------------------------------------------------------
-# Helper Functions (Normalization Rules)
-# -----------------------------------------------------------------------
+REPO = Path(__file__).resolve().parents[1]
+INTERIM = REPO / "data/interim"
+PROCESSED = REPO / "data/processed"
+PROCESSED.mkdir(exist_ok=True)
 
-def canonicalize_id(raw_id, source):
-    if not raw_id:
-        return None
+MITRE_FILE = INTERIM / "mitre_parsed.jsonl"
+CWE_FILE = INTERIM / "cwe_parsed.jsonl"
+NIST_FILE = INTERIM / "nist_parsed.jsonl"
 
-    raw_id = raw_id.strip()
+OUT_FILE = PROCESSED / "nodes_standardized.jsonl"
 
-    if source == "CWE":
-        num = raw_id.replace("CWE-", "").lstrip("0")
-        return f"CWE-{num}"
+def load_jsonl(path):
+    nodes = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                nodes.append(json.loads(line))
+    return nodes
 
-    if source == "MITRE":
-        # ATT&CK IDs are usually correct; just uppercase and trim spaces
-        return raw_id.upper()
-
-    if source == "NIST":
-        return raw_id  # Usually already canonical (AC-2, AC-2(1), etc.)
-
-    return raw_id
-
-
-def clean_text(text):
-    if text is None:
-        return ""
-    # Remove HTML
-    text = BeautifulSoup(text, "html.parser").text
-    # Normalize whitespace
-    text = re.sub(r"\s+", " ", text)
-    text = text.strip()
-    return text
-
-
-def normalize_keywords(keyword_list):
-    if not keyword_list:
+def ensure_list(v):
+    if not v:
         return []
-    return [k.lower().strip() for k in keyword_list if k]
+    if isinstance(v, list):
+        return v
+    if isinstance(v, str):
+        return [v]
+    return list(v)
 
+print("[+] Loading interim data...")
+mitre = load_jsonl(MITRE_FILE)
+cwe   = load_jsonl(CWE_FILE)
+nist  = load_jsonl(NIST_FILE)
 
-def normalize_date(raw_date):
-    if not raw_date:
-        return None
-    try:
-        raw_date = raw_date.replace("Z", "")
-        base = raw_date.split("T")[0]
-        dt = datetime.fromisoformat(base)
-        return dt.strftime("%Y-%m-%d")
-    except Exception:
-        return None
+standardized = []
 
+print("[+] Standardizing MITRE...")
+for n in mitre:
+    out = {
+        "id": n["id"],
+        "source": "MITRE",
+        "title": n.get("title", ""),
+        "description": n.get("description", ""),
 
-# -----------------------------------------------------------------------
-# Standardization Logic
-# -----------------------------------------------------------------------
+        "summary_512": n.get("summary_512") or n.get("description","")[:512],
 
-def standardize_node(obj):
-    """
-    Takes a raw parsed node from interim JSONL and returns a unified schema node.
-    Handles MITRE, CWE, and NIST inputs.
-    """
-    raw_id = obj.get("id")
-    source = obj.get("source")
+        "categories": ensure_list(n.get("categories")),
+        "keywords": ensure_list(n.get("keywords")) + ensure_list(n.get("tactics")),
 
-    # ------------------------------
-    # Detect source if missing
-    # ------------------------------
-    if source is None:
-        if raw_id.startswith("T"):
-            source = "MITRE"
-        elif raw_id.startswith("CWE"):
-            source = "CWE"
-        else:
-            source = "NIST"
+        "rev_date": n.get("rev_date"),
+        "url": n.get("url")
+    }
 
-    node = {}
-    
-    # NR1: canonical ID
-    node["id"] = canonicalize_id(raw_id, source)
-    node["source"] = source
+    standardized.append(out)
 
-    # ------------------------------
-    # MITRE extraction
-    # ------------------------------
-    if source == "MITRE":
-        node["title"] = clean_text(obj.get("name"))
-        node["description"] = clean_text(obj.get("description"))
+print("[+] Standardizing CWE...")
+for n in cwe:
+    out = {
+        "id": n["id"],
+        "source": "CWE",
+        "title": n.get("title") or n.get("name",""),
+        "description": n.get("description",""),
 
-        # categories = tactics
-        node["categories"] = obj.get("tactics", [])
+        "summary_512": (n.get("description") or "")[:512],
 
-        # keywords = title tokens (lowercase) + tactics
-        title_kw = node["title"].lower().split()
-        tactic_kw = [t.lower().replace("-", " ") for t in obj.get("tactics", [])]
-        node["keywords"] = normalize_keywords(title_kw + tactic_kw)
+        "categories": ensure_list(n.get("categories")),
+        "keywords": ensure_list(n.get("keywords")),
 
-        # extract MITRE URL
-        url = None
-        for ref in obj.get("external_references", []):
-            if ref.get("source_name") == "mitre-attack":
-                url = ref.get("url")
-                break
-        node["url"] = url
+        "rev_date": n.get("rev_date"),
+        "url": n.get("url")
+    }
+    standardized.append(out)
 
-        # rev_date: MITRE STIX sometimes includes "modified"
-        node["rev_date"] = normalize_date(obj.get("modified"))
+print("[+] Standardizing NIST...")
+for n in nist:
+    out = {
+        "id": n["id"],
+        "source": "NIST",
+        "title": n.get("title",""),
+        "description": n.get("description",""),
 
-    # ------------------------------
-    # CWE extraction
-    # ------------------------------
-    elif source == "CWE":
-        node["title"] = clean_text(obj.get("name"))
-        node["description"] = clean_text(obj.get("description"))
-        node["categories"] = obj.get("weakness_abstraction", [])
-        node["keywords"] = normalize_keywords(obj.get("keywords", []))
-        node["rev_date"] = normalize_date(obj.get("rev_date"))
-        node["url"] = obj.get("url")
+        "summary_512": (n.get("description") or "")[:512],
 
-    # ------------------------------
-    # NIST extraction
-    # ------------------------------
-    elif source == "NIST":
-        node["title"] = clean_text(obj.get("title"))
-        node["description"] = clean_text(obj.get("text"))
-        node["categories"] = [obj.get("family")] if obj.get("family") else []
-        node["keywords"] = normalize_keywords(node["title"].split())
-        node["rev_date"] = None    # NIST often lacks dates
-        node["url"] = None
+        "categories": ensure_list(n.get("categories")),
+        "keywords": ensure_list(n.get("keywords")),
 
-    # Summary placeholder
-    node["summary_512"] = None
+        "rev_date": n.get("rev_date"),
+        "url": n.get("url")
+    }
+    standardized.append(out)
 
-    return node
+print(f"[+] Total standardized nodes: {len(standardized)}")
 
+with open(OUT_FILE, "w", encoding="utf-8") as f:
+    for n in standardized:
+        f.write(json.dumps(n) + "\n")
 
-
-# -----------------------------------------------------------------------
-# Main Pipeline
-# -----------------------------------------------------------------------
-
-def main():
-    INPUT_DIR = Path("data/interim")
-    OUTPUT_DIR = Path("processed")
-    OUTPUT_DIR.mkdir(exist_ok=True)
-
-    output_file = OUTPUT_DIR / "nodes_standardized.jsonl"
-
-    seen = set()
-    count = 0
-
-    with output_file.open("w", encoding="utf-8") as out:
-
-        # Process all parsed data files
-        for file_name in ["mitre_parsed.jsonl", "cwe_parsed.jsonl", "nist_parsed.jsonl"]:
-            input_path = INPUT_DIR / file_name
-
-            if not input_path.exists():
-                print(f"[WARN] Missing file: {input_path}")
-                continue
-
-            with input_path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    obj = json.loads(line)
-
-                    node = standardize_node(obj)
-
-                    # NR5 — Deduplication key
-                    key = (node["id"], node["source"])
-                    if key in seen:
-                        continue
-
-                    seen.add(key)
-                    out.write(json.dumps(node, ensure_ascii=False) + "\n")
-                    count += 1
-
-    print(f"[OK] Standardized nodes written: {count}")
-    print(f"File created: {output_file}")
-
-
-if __name__ == "__main__":
-    main()
+print("[✓] Saved:", OUT_FILE)

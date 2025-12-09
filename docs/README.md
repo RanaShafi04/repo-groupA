@@ -1,30 +1,28 @@
 # Group A – Unified ATT&CK → CWE → NIST Crosswalk
 
-Version: **v1.0**
+## Version: v1.0
 
-This repository contains a fully standardized security knowledge graph linking:
+This repository contains an end-to-end pipeline that builds a standardized cybersecurity knowledge graph linking:
 
-* **MITRE ATT&CK Techniques**
-* **MITRE CWE Weaknesses**
-* **NIST 800-53 Controls**
+- MITRE ATT&CK techniques
+- MITRE CWE weaknesses
+- NIST SP 800-53 controls
 
-The project normalizes heterogeneous cybersecurity datasets into a **unified schema**, produces a **high-quality crosswalk**, and runs a **QA pipeline** to ensure data integrity, coverage, and reproducibility.
+The system parses heterogeneous upstream datasets, normalizes them into a unified schema, generates a multi-stage crosswalk, and performs a structured QA process to ensure accuracy, coverage, and reproducibility.
 
----
-
-## 📁 Repository Structure
-
-```
+## Repository Structure
 schema/
   unified_schema.json
   field_dictionary.md
 
 mapping/
   attck_cwe_nist_crosswalk.csv
+  crosswalk_rejects.jsonl
+  score_histogram.png
   mapping_guide.md
 
 data/
-  raw/
+  source/
   interim/
   processed/
     nodes_standardized.jsonl
@@ -40,132 +38,136 @@ scripts/
   parse_mitre.py
   parse_cwe.py
   parse_nist.py
-  build_crosswalk.py
   export_llm_ready.py
-  qa_pipeline.py
+  build_crosswalk.py
+  qa_crosswalk.py
+  package_release.py
 
 releases/
   groupA_dataset_v1.jsonl
   groupA_dataset_v1.csv
   checksums.txt
-```
 
----
+## Pipeline Overview
+1. Parse raw datasets
 
-## 🚀 How to Run the Pipeline
+Each dataset is extracted and normalized:
 
-### 1. Parse and standardize raw sources
-
-```bash
 python scripts/parse_mitre.py
 python scripts/parse_cwe.py
 python scripts/parse_nist.py
-```
 
-### 2. Standardize into unified schema
 
-```bash
+This generates structured JSONL files in data/interim/.
+
+2. Convert to unified schema
 python scripts/export_llm_ready.py
-```
 
-This produces:
 
-* `nodes_standardized.jsonl`
-* `relations_standardized.jsonl` (empty until crosswalk is built)
+### Outputs:
 
-### 3. Build the crosswalk
+nodes_standardized.jsonl
 
-```bash
+relations_standardized.jsonl (initially empty)
+
+3. Build the crosswalk (ATT&CK → CWE → NIST)
 python scripts/build_crosswalk.py
-```
 
-Outputs:
 
-* `mapping/attck_cwe_nist_crosswalk.csv`
-* `data/processed/relations_standardized.jsonl`
+This script uses:
 
-### 4. Run QA
+fuzzy text similarity
 
-```bash
-python scripts/qa_pipeline.py
-```
+keyword overlap
 
-Outputs:
+expanded security-concept matching
 
-* `docs/qa_checklist.md`
-* `mapping/score_histogram.png`
-* Updated `decisions_log.md`
+description overlap
 
-### 5. Produce Release Bundle
+cross-mention scoring
 
-```bash
+### Outputs:
+
+mapping/attck_cwe_nist_crosswalk.csv (columns: src_id, dst_id, relation_type, evidence)
+
+mapping/crosswalk_rejects.jsonl
+
+data/processed/relations_standardized.jsonl
+
+4. Run QA Validation
+python scripts/qa_crosswalk.py
+
+
+### Produces:
+
+docs/qa_checklist.md
+
+mapping/score_histogram.png
+
+logs in logs/
+
+The QA script validates:
+
+field completeness
+
+duplicate node IDs
+
+duplicate edges (using src_id,dst_id,relation_type)
+
+link density (ATT&CK→CWE and CWE→NIST)
+
+summary token limits
+
+score distribution
+
+5. Build final release bundle
 python scripts/package_release.py
-```
 
-Creates:
 
-* `releases/groupA_dataset_v1.jsonl`
-* `releases/groupA_dataset_v1.csv`
-* `releases/checksums.txt`
+### Creates:
 
----
+releases/groupA_dataset_v1.jsonl
 
-## 🧱 Unified Schema Overview
+releases/groupA_dataset_v1.csv
 
-Required fields:
+releases/checksums.txt
 
-| Field         | Type   | Description                      |
-| ------------- | ------ | -------------------------------- |
-| `id`          | string | Canonical node identifier        |
-| `title`       | string | Human-readable name              |
-| `description` | string | Cleaned + normalized description |
-| `source`      | enum   | `MITRE`, `CWE`, `NIST`           |
-| `keywords`    | list   | Extracted semantic keywords      |
-| `summary_512` | string | Token-limited summary            |
+## Unified Schema (Core Fields)
+Field	Type	Description
+id	string	Canonical node ID (e.g., T1059.003, CWE-79, AC-02)
+title	string	Human-readable name
+description	string	Cleaned and normalized text
+source	enum	One of: MITRE, CWE, NIST
+keywords	list	Extracted normalized keywords
+categories	list	Control family / weakness abstraction
+summary_512	string	LLM-ready ≤512-token summary
 
-Full schema: `schema/unified_schema.json`.
+Full specification: schema/unified_schema.json
 
----
+## QA Requirements
 
-## 📊 QA Requirements
+The dataset is considered valid when:
 
-The dataset must satisfy:
+≥95% field coverage
 
-* **≥95% field coverage**
-* **0 duplicate node IDs**
-* **<0.5% duplicate edges**
-* **All summaries ≤512 tokens**
-* **≥1 CWE per applicable ATT&CK technique**
-* **≥1 NIST control per mapped CWE**
+0 duplicate node IDs
 
-Full checklist in: `docs/qa_checklist.md`.
+Duplicate edges <0.5%
+(checked using src_id, dst_id, relation_type)
 
----
+No summary exceeds 512 tokens
 
-## 📦 Release Bundle Contents
+Each ATT&CK technique maps to ≥1 CWE (unless conceptually unmappable)
 
-| File                      | Purpose                         |
-| ------------------------- | ------------------------------- |
-| `groupA_dataset_v1.jsonl` | Metadata + node/edge references |
-| `groupA_dataset_v1.csv`   | CSV version                     |
-| `checksums.txt`           | SHA256 checksums for integrity  |
+Each CWE maps to ≥1 NIST control
 
----
+See: docs/qa_checklist.md.
 
-## 📝 FAQ
+## Release Bundle Contents
+File	Purpose
+groupA_dataset_v1.jsonl	Unified graph with node + edge metadata
+groupA_dataset_v1.csv	Flat CSV export
+checksums.txt	Hashes for data integrity
+## Maintainers
 
-**Q: Why do some ATT&CK techniques map to multiple CWEs?**
-Because techniques represent behaviors, while CWEs represent structural weaknesses, many-to-many mappings occur naturally.
-
-**Q: How do I contribute?**
-Open an issue or submit a pull request. Follow `mapping_guide.md` for crosswalk changes.
-
-**Q: Where is the gold set used for threshold calibration?**
-See `docs/decisions_log.md`.
-
----
-
-## 👤 Maintainers
-
-Group A – Cybersecurity Knowledge Graph
-Erasmus Mundus Cohort, 2025
+Group A – CyberMACS Cybersecurity Knowledge Graph Project (2025)
