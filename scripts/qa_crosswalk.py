@@ -65,7 +65,7 @@ field_pass = all(v >= 95 for v in coverage.values())
 # Duplicates
 # ---------------------------------------------
 duplicate_ids = nodes["id"].duplicated().sum()
-duplicate_edges = df.duplicated(["source_id", "target_id", "relation_type"]).sum()
+duplicate_edges = df.duplicated(["src_id", "dst_id", "relation_type"]).sum()
 edge_dup_rate = duplicate_edges / max(1, len(df))
 
 dup_pass = (duplicate_ids == 0) and (edge_dup_rate < 0.005)
@@ -91,11 +91,11 @@ mitre_nodes = nodes[nodes["source"] == "MITRE"]["id"].tolist()
 cwe_nodes = nodes[nodes["source"] == "CWE"]["id"].tolist()
 
 mitre_to_cwe = df[df["relation_type"] == "related_to"]
-mitre_has_cwe = mitre_to_cwe["source_id"].nunique()
+mitre_has_cwe = mitre_to_cwe["src_id"].nunique()
 density_mitre_cwe = mitre_has_cwe / max(1, len(mitre_nodes))
 
 cwe_to_nist = df[df["relation_type"] == "mitigated_by"]
-cwe_has_nist = cwe_to_nist["source_id"].nunique()
+cwe_has_nist = cwe_to_nist["src_id"].nunique()
 density_cwe_nist = cwe_has_nist / max(1, len(cwe_nodes))
 
 density_pass = (density_mitre_cwe >= 1.0) and (density_cwe_nist >= 1.0)
@@ -105,7 +105,7 @@ density_pass = (density_mitre_cwe >= 1.0) and (density_cwe_nist >= 1.0)
 # Score histogram
 # ---------------------------------------------
 plt.figure(figsize=(8, 4))
-plt.hist(df["score"], bins=40)
+plt.hist(df["evidence"], bins=40)
 plt.title("Crosswalk Score Distribution")
 plt.xlabel("Score")
 plt.ylabel("Count")
